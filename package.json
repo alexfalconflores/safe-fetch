@@ -1,0 +1,41 @@
+{
+  "name": "@alexfalconflores/safe-fetch",
+  "version": "1.0.0",
+  "description": "A safe and customizable fetch wrapper for secure HTTP requests.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexfalconflores/safe-fetch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alexfalconflores/safe-fetch/issues"
+  },
+  "homepage": "https://github.com/alexfalconflores/safe-fetch#readme",
+  "keywords": [
+    "fetch",
+    "http",
+    "secure",
+    "api",
+    "http-client",
+    "request-wrapper"
+  ],
+  "author": "Alex Stefano Falcon Flores",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup src/index.ts --watch --dts",
+    "clean": "rm -rf dist",
+    "publish": "npm publish --access public"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3"
+  }
+}
