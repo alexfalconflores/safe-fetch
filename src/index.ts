@@ -38,7 +38,7 @@ export function Join(
   return args.flat().join(separator);
 }
 
-const toHeaders = (headers: HeadersType | Headers): Headers => {
+export const toHeaders = (headers: HeadersType | Headers): Headers => {
   if (headers instanceof Headers) return headers;
   return new Headers(
     Object.entries(headers).reduce<[string, string][]>((acc, [key, value]) => {
