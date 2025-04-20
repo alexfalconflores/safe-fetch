@@ -1,7 +1,7 @@
 <h1 align="center">
     safeFetch
   <br />
-  <img src="https://github.com/alexfalconflores/safe-fetch/blob/87e177f3c85b79299b7a6b8bbe3f0a7f342e77e8/logo.svg" alt="safeFetch logo" width="150"/>
+  <img src="https://github.com/alexfalconflores/safe-fetch/blob/4fd0a9af158b69fa3bab5861ce13c552203845d9/logo.svg" alt="safeFetch logo" width="150"/>
 </h1>
 
 <p align="center">
