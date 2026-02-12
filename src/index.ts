@@ -1,76 +1,120 @@
+/**
+ * ⚙️ **Configuración Global de SafeFetch**
+ * Define el comportamiento base, interceptores y manejo de errores
+ * para todas las peticiones realizadas con esta instancia.
+ */
 export interface SafeFetchConfig {
+  /**
+   * URL base que se prefijará a todas las peticiones relativas.
+   * @example "https://api.mi-backend.com/v1"
+   */
   baseUrl?: string;
+  /** Headers globales que se enviarán en cada petición (ej: API Keys publicas). */
   headers?: HeadersType;
   /**
-   * Hook asíncrono que se ejecuta ANTES de cada petición.
-   * Ideal para inyectar tokens o headers dinámicos (cookies, ip, etc).
+   * ⚡ **Interceptor de Solicitud (Pre-Request)**
+   * Hook asíncrono que se ejecuta ANTES de que la petición salga.
+   *
+   * Úsalo para:
+   * - Inyectar Tokens de Autenticación (Bearer).
+   * - Agregar headers dinámicos (Timestamp, Fingerprint).
+   * - Modificar la URL al vuelo.
+   *
+   * @example
+   * onRequest: async (url, config) => {
+   * const token = await getToken();
+   * config.headers = { ...config.headers, Authorization: `Bearer ${token}` };
+   * return config;
+   * }
    */
   onRequest?: (
     url: string,
     init: RequestInitExt,
   ) => Promise<RequestInitExt> | RequestInitExt;
   /**
-   * Hook asíncrono que se ejecuta DESPUÉS de recibir la respuesta.
-   * Ideal para detectar 401, logging, o errores globales.
+   * ⚡ **Interceptor de Respuesta (Post-Response)**
+   * Hook asíncrono que se ejecuta DESPUÉS de recibir la respuesta,
+   * independientemente del status code (siempre que no sea error de red).
+   * Útil para logging global.
    */
   onResponse?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 200 (OK) */
+  // --- Status Handlers (2xx) ---
+  /** Ejecutado cuando el backend devuelve 200 (OK). */
   on200?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 201 (Created) */
+  /** Ejecutado cuando el backend devuelve 201 (Created). Ideal para notificaciones "Guardado con éxito". */
   on201?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 202 (Accepted) */
+  /** Ejecutado cuando el backend devuelve 202 (Accepted). */
   on202?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 203 (Non-Authoritative Information) */
+  /** Ejecutado cuando el backend devuelve 203 (Non-Authoritative Info). */
   on203?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 204 (No Content) */
+  /** Ejecutado cuando el backend devuelve 204 (No Content). */
   on204?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 205 (Reset Content) */
+  /** Ejecutado cuando el backend devuelve 205 (Reset Content). */
   on205?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 206 (Partial Content) */
+  /** Ejecutado cuando el backend devuelve 206 (Partial Content). */
   on206?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 207 (Multi-Status) */
+  /** Ejecutado cuando el backend devuelve 207 (Multi-Status). */
   on207?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 208 (Already Reported) */
+  /** Ejecutado cuando el backend devuelve 208 (Already Reported). */
   on208?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 226 (IM Used) */
+  /** Ejecutado cuando el backend devuelve 226 (IM Used). */
   on226?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 300 (Multiple Choices) */
+
+  // --- Redirection Handlers (3xx) ---
+  /** Ejecutado en 300 (Multiple Choices). */
   on300?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 301 (Moved Permanently) */
+  /** Ejecutado en 301 (Moved Permanently). */
   on301?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 302 (Found) */
+  /** Ejecutado en 302 (Found). */
   on302?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 303 (See Other) */
+  /** Ejecutado en 303 (See Other). */
   on303?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 304 (Not Modified) */
+  /** Ejecutado en 304 (Not Modified). Útil para manejo de caché local. */
   on304?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 307 (Temporary Redirect) */
+  /** Ejecutado en 307 (Temporary Redirect). */
   on307?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 308 (Permanent Redirect) */
+  /** Ejecutado en 308 (Permanent Redirect). */
   on308?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 400 (Bad Request) */
+
+  // --- Client Error Handlers (4xx) ---
+  /** Ejecutado en 400 (Bad Request). Ideal para mostrar errores de validación. */
   on400?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 401 (Unauthorized) */
+  /**
+   * 🔒 **Unauthorized Handler (401)**
+   * Crítico para manejar sesiones expiradas.
+   * @example
+   * on401: () => { router.push('/login'); }
+   */
   on401?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 402 (Payment Required) */
+  /** Ejecutado en 402 (Payment Required). */
   on402?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 403 (Forbidden) */
+  /** Ejecutado en 403 (Forbidden). El usuario no tiene permisos. */
   on403?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 404 (Not Found) */
+  /** Ejecutado en 404 (Not Found). */
   on404?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 405 (Method Not Allowed) */
+  /** Ejecutado en 405 (Method Not Allowed). */
   on405?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve >= 500 (Server Error) */
+  // --- Server Error Handlers (5xx) ---
+  /**
+   * 🚨 **Global Server Error (>= 500)**
+   * Se ejecuta para cualquier error 500+ (incluyendo 502, 503, etc).
+   * Útil para reportar errores críticos a servicios como Sentry.
+   */
   on500?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 502 (Bad Gateway) */
+  /** Ejecutado en 502 (Bad Gateway). */
   on502?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 503 (Service Unavailable) */
+  /** Ejecutado en 503 (Service Unavailable). Mantenimiento o sobrecarga. */
   on503?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 504 (Gateway Timeout) */
+  /** Ejecutado en 504 (Gateway Timeout). */
   on504?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando el backend devuelve 505 (HTTP Version Not Supported) */
+  /** Ejecutado en 505 (HTTP Version Not Supported). */
   on505?: (response: Response) => Promise<void> | void;
-  /** Se ejecuta cuando fetch falla por red (sin internet, DNS, etc) */
+
+  /**
+   * 💥 **Network Error Handler**
+   * Se ejecuta cuando `fetch` falla a nivel de red (Sin internet, DNS fallido, CORS bloqueado).
+   * NO se ejecuta en errores 4xx o 5xx (eso son respuestas válidas del servidor).
+   */
   onError?: (error: unknown) => void;
 }
 
@@ -79,6 +123,18 @@ let globalConfig: SafeFetchConfig = {
   headers: {},
 };
 
+/**
+ * 🚀 **SafeFetch Core**
+ * Wrapper inteligente sobre `fetch` nativo que agrega:
+ * 1. Base URL automática.
+ * 2. Autocompletado de Headers estrictos.
+ * 3. Stringify automático del body si es JSON.
+ * 4. Interceptores de ciclo de vida (onRequest, onResponse).
+ * 5. Manejadores de estado HTTP (on401, on500, etc).
+ *
+ * @param url Ruta relativa (si se configuró baseUrl) o absoluta.
+ * @param init Configuración de la petición (headers, body, method).
+ */
 export async function safeFetchCore(
   url: string,
   init?: RequestInitExt,
@@ -92,15 +148,26 @@ export async function safeFetchCore(
     headers: mergeHeaders(globalConfig.headers, init?.headers),
   };
 
+  // 1. Ejecutar Interceptor Pre-Request
   if (globalConfig.onRequest) {
     // Le pasamos el control a la config global para que modifique el init
     finalInit = await globalConfig.onRequest(finalUrl, finalInit);
   }
 
-  const { method = "GET", headers, body, ...props } = finalInit || {};
+  const {
+    method = "GET",
+    headers,
+    body,
+    timeout,
+    retries = 0,
+    retryDelay = 1000,
+    ...props
+  } = finalInit || {};
+
   const contentTypeJson: ContentType = "application/json";
   let newBody = body;
 
+  // 2. Auto-Stringify JSON Body
   if (
     body &&
     typeof body === "object" &&
@@ -109,46 +176,106 @@ export async function safeFetchCore(
     newBody = JSON.stringify(body);
   }
 
-  try {
-    const response = await fetch(finalUrl, {
-      method,
-      headers: toHeaders(headers || ({} as HeadersType)),
-      body: newBody as BodyInit,
-      ...props,
-    });
+  // Variable para guardar el último error o respuesta fallida
+  let lastError: any;
+  let response: Response | undefined;
 
-    const statusHandlerName = `on${response.status}` as keyof SafeFetchConfig;
-    const specificHandler = globalConfig[statusHandlerName];
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let controller: AbortController | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      if (timeout) {
+        controller = new AbortController();
+        props.signal = controller.signal;
+        timeoutId = setTimeout(() => controller?.abort(), timeout);
+      }
 
-    if (typeof specificHandler === "function") {
-      // TypeScript no sabe si recibe args o no, pero en JS pasar args extra no rompe nada.
-      // Casteamos a Function para evitar errores de tipado estricto aquí.
-      await (specificHandler as Function)(response);
+      const response = await fetch(finalUrl, {
+        method,
+        headers: toHeaders(headers || ({} as HeadersType)),
+        body: newBody as BodyInit,
+        ...props,
+      });
+
+      // Limpiar timeout si hubo éxito de red
+      if (timeoutId) clearTimeout(timeoutId);
+
+      // 3. Lógica de "Debería reintentar?" para Status Codes
+      // Si es 5xx (Error de servidor), lo consideramos fallo temporal.
+      // Si es < 500 (ej: 200, 404), es una respuesta válida, rompemos el bucle.
+      if (response.status < 500) {
+        break;
+      } else {
+        // Es un error 500. Si nos quedan intentos, lanzamos error para ir al catch
+        // y provocar el reintento. Si es el último, no lanzamos y dejamos pasar la response.
+        if (attempt < retries) {
+          throw new Error(`Server Error ${response.status}`);
+        }
+      }
+    } catch (error: any) {
+      // Capturamos Errores de Red, Timeout o nuestro Error 500 forzado arriba
+      lastError = error;
+
+      // Limpieza de seguridad
+      if (timeoutId) clearTimeout(timeoutId);
+
+      // Si es Timeout, mejoramos el mensaje
+      if (error.name === "AbortError" && timeout) {
+        lastError = new Error(`Request timeout after ${timeout}ms`);
+      }
+
+      // 4. Decisión: ¿Reintentamos o nos rendimos?
+      if (attempt < retries) {
+        // Esperamos antes del siguiente intento (Backoff simple)
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        continue; // 🔄 Vuelve al inicio del for
+      }
     }
-
-    if (
-      response.status >= 500 &&
-      globalConfig.on500 &&
-      response.status !== 500
-    ) {
-      // Evitamos ejecutarlo doble si el status es exactamente 500
-      await globalConfig.on500(response);
-    }
-
-    if (globalConfig.onResponse) {
-      await globalConfig.onResponse(response);
-    }
-
-    return response;
-  } catch (error) {
-    if (globalConfig.onError) {
-      globalConfig.onError(error);
-    }
-    // Re-lanzamos el error para que el componente también se entere si quiere
-    throw error;
+    // Si llegamos aquí sin 'continue', es porque el fetch tuvo éxito (status < 500)
+    // o porque se acabaron los intentos. Rompemos el bucle.
+    break;
   }
+
+  // Si no hay response (porque fallaron todos los intentos de red/timeout)
+  if (!response) {
+    if (globalConfig.onError) globalConfig.onError(lastError);
+    throw lastError; // Lanzamos el último error capturado
+  }
+
+  // Ejecutar Handlers Específicos de Status (on200, on404, etc)
+  const statusHandlerName = `on${response.status}` as keyof SafeFetchConfig;
+  const specificHandler = globalConfig[statusHandlerName];
+
+  if (typeof specificHandler === "function") {
+    // TypeScript no sabe si recibe args o no, pero en JS pasar args extra no rompe nada.
+    // Casteamos a Function para evitar errores de tipado estricto aquí.
+    await (specificHandler as Function)(response);
+  }
+
+  if (response.status >= 500 && globalConfig.on500 && response.status !== 500) {
+    // Evitamos ejecutarlo doble si el status es exactamente 500
+    await globalConfig.on500(response);
+  }
+
+  if (globalConfig.onResponse) {
+    await globalConfig.onResponse(response);
+  }
+
+  return response;
 }
 
+/**
+ * 🛠️ **Configuración**
+ * Permite establecer la configuración global de `safeFetch`.
+ * Las configuraciones se fusionan, no se sobrescriben destructivamente.
+ *
+ * @param config Objeto parcial de configuración.
+ * @example
+ * safeFetch.configure({
+ * baseUrl: "https://api.xyz.com",
+ * on401: () => logout(),
+ * });
+ */
 const configure = (config: SafeFetchConfig) => {
   // Fusionamos la config nueva con la existente
   globalConfig = {
@@ -159,6 +286,10 @@ const configure = (config: SafeFetchConfig) => {
   };
 };
 
+/**
+ * La instancia principal de SafeFetch.
+ * Se puede usar como función directa `safeFetch(url)` o configurar vía `safeFetch.configure()`.
+ */
 export const safeFetch = Object.assign(safeFetchCore, {
   configure, // safeFetch.configure({...})
   // También puedes exponer métodos helpers si quieres
@@ -167,11 +298,25 @@ export const safeFetch = Object.assign(safeFetchCore, {
 
 export default safeFetch;
 
+/** Extensión de RequestInit para soportar tipado fuerte de métodos y headers */
 export interface RequestInitExt extends Omit<RequestInit, "headers"> {
   method?: HttpMethod;
   headers?: HeadersType;
+  /**
+   * ⏱️ Tiempo máximo de espera en milisegundos.
+   * Si la petición tarda más, se abortará y lanzará un error.
+   * @example 5000 (5 segundos)
+   */
+  timeout?: number;
+  /** 🔄 Número de reintentos en caso de fallo (Red o 5xx). Default: 0 */
+  retries?: number;
+  /** ⏳ Tiempo de espera entre reintentos (ms). Default: 1000 */
+  retryDelay?: number;
 }
 
+/**
+ * Utilidad para unir cadenas o arrays (útil para clases CSS o Paths).
+ */
 export function Join(
   separator: string = "",
   ...args: (string | number | (string | number)[])[]
@@ -179,6 +324,7 @@ export function Join(
   return args.flat().join(separator);
 }
 
+/** Convierte el objeto de headers tipado a Headers nativos */
 export const toHeaders = (headers: HeadersType | Headers): Headers => {
   if (headers instanceof Headers) return headers;
 
@@ -204,7 +350,9 @@ function mergeHeaders(
     ...((local as Record<string, string>) || {}),
   };
 }
-
+// ============================================================================
+// 📦 TIPADO ESTRICTO DE HTTP
+// ============================================================================
 export type HttpMethod =
   | "GET"
   | "POST"
@@ -217,6 +365,7 @@ export type HttpMethod =
   | "TRACE"
   | (string & {});
 
+/** Tipado exhaustivo de Content-Types comunes para autocompletado */
 export type ContentType =
   // --- Standard Web & API ---
   | "application/json"
@@ -258,6 +407,7 @@ export type ContentType =
   | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
   | (string & {});
 
+/** Patrones de autorización comunes */
 export type AuthorizationType =
   // --- Standards ---
   | `Bearer ${string}` // JWT
@@ -452,6 +602,11 @@ export type AccessControlAllowMethodsType =
 
 export type AccessControlAllowHeadersType = string; // Mantiene la flexibilidad y evita el error
 
+/**
+ * 🧱 **Headers Tipados**
+ * Provee autocompletado para todos los headers HTTP estándar,
+ * pero permite strings arbitrarios para headers personalizados.
+ */
 export type HeadersType = {
   "Content-Type"?: ContentType;
   Authorization?: AuthorizationType;
