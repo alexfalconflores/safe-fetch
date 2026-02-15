@@ -11,6 +11,8 @@ export interface SafeFetchConfig {
   baseUrl?: string;
   /** Headers globales que se enviarán en cada petición (ej: API Keys publicas). */
   headers?: HeadersType;
+  /** 🐞 Si es true, imprime logs y comandos cURL en la consola al fallar. */
+  debug?: boolean;
   /**
    * ⚡ **Interceptor de Solicitud (Pre-Request)**
    * Hook asíncrono que se ejecuta ANTES de que la petición salga.
@@ -38,6 +40,13 @@ export interface SafeFetchConfig {
    * Útil para logging global.
    */
   onResponse?: (response: Response) => Promise<void> | void;
+  /** * Permite interceptar errores de respuesta (ej: 401) para intentar corregirlos.
+   * Si devuelve una Response, se usa esa y no se lanza error.
+   */
+  onResponseError?: (
+    response: Response,
+    attempt: number,
+  ) => Promise<Response | void>;
   // --- Status Handlers (2xx) ---
   /** Ejecutado cuando el backend devuelve 200 (OK). */
   on200?: (response: Response) => Promise<void> | void;
@@ -119,9 +128,10 @@ export interface SafeFetchConfig {
 }
 
 /** Extensión de RequestInit para soportar tipado fuerte de métodos y headers */
-export interface RequestInitExt extends Omit<RequestInit, "headers"> {
+export interface RequestInitExt extends Omit<RequestInit, "headers" | "body"> {
   method?: HttpMethod;
   headers?: HeadersType;
+  body?: BodyInit | Record<string, any> | any[] | null;
   /**
    * ⏱️ Tiempo máximo de espera en milisegundos.
    * Si la petición tarda más, se abortará y lanzará un error.
@@ -132,25 +142,48 @@ export interface RequestInitExt extends Omit<RequestInit, "headers"> {
   retries?: number;
   /** ⏳ Tiempo de espera entre reintentos (ms). Default: 1000 */
   retryDelay?: number;
+  /** * 📦 Tipo de respuesta esperada.
+   * - "json" (Default): Intenta parsear JSON.
+   * - "blob": Para archivos, imágenes, PDFs.
+   * - "text": Para HTML, CSV, XML.
+   * - "arrayBuffer": Para manipulación binaria raw.
+   * - "response": Devuelve el objeto Response nativo sin procesar.
+   */
+  responseType?: "json" | "text" | "blob" | "arrayBuffer" | "response";
+  /** * 🔍 Objeto de Query Params.
+   * Se convertirán automáticamente a string (ej: ?page=1&sort=asc)
+   */
+  params?: Record<
+    string,
+    string | number | boolean | (string | number | boolean)[] | undefined | null
+  >;
 }
 
-// let globalConfig: SafeFetchConfig = {
-//   baseUrl: "",
-//   headers: {},
-// };
-
 /**
- * 🏭 **Factory Function**
- * Esta función es la "fábrica". Cada vez que la llamas, crea un entorno nuevo
- * con su propia configuración (localConfig) totalmente aislada.
+ * 🏭 **Factory Function: createSafeFetch**
+ * * Crea una instancia aislada de `safeFetch` con su propia configuración.
+ * Ideal para manejar múltiples APIs con diferentes `baseUrl` o `headers`.
+ * * @param defaultConfig Configuración inicial (base URL, headers, debug, etc).
+ * @returns Una instancia de safeFetch con métodos HTTP (get, post...) y control de ciclo de vida.
+ * * @example
+ * const api = createSafeFetch({ baseUrl: "https://api.example.com", headers: { "X-Auth": "123" } });
+ * const users = await api.get("/users");
  */
 export function createSafeFetch(defaultConfig: SafeFetchConfig = {}) {
+  const activeControllers = new Set<AbortController>();
+
   let localConfig: SafeFetchConfig = {
     baseUrl: "",
     headers: {},
+    debug: false,
     ...defaultConfig,
   };
 
+  /**
+   * Actualiza la configuración de la instancia actual.
+   * Fusiona los valores nuevos con los existentes.
+   * @param config Nueva configuración parcial.
+   */
   const configure = (config: SafeFetchConfig) => {
     localConfig = {
       ...localConfig,
@@ -159,23 +192,54 @@ export function createSafeFetch(defaultConfig: SafeFetchConfig = {}) {
     };
   };
 
+  /**
+   * 🧠 **Núcleo de SafeFetch**
+   * * Ejecuta la petición HTTP con toda la lógica de seguridad:
+   * - Retries (Reintentos automáticos)
+   * - Timeouts seguros
+   * - Cancelación masiva (AbortAll)
+   * - Interceptores (onRequest, onResponse)
+   * - Manejo de errores unificado
+   * * @param url Ruta relativa o absoluta.
+   * @param init Opciones de la petición.
+   * @returns Promesa con la respuesta `Response` nativa (sin parsear).
+   */
   const core = async (
     url: string,
     init?: RequestInitExt,
   ): Promise<Response> => {
-    const finalUrl = url.startsWith("http")
+    let finalUrl = url.startsWith("http")
       ? url
       : `${localConfig.baseUrl || ""}${url.startsWith("/") ? url : `/${url}`}`;
+
+    let urlWithParams = finalUrl;
+    if (init?.params) {
+      const urlObj = new URL(
+        finalUrl.startsWith("http") ? finalUrl : `http://dummy${finalUrl}`,
+      );
+      Object.entries(init.params).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        if (Array.isArray(value)) {
+          value.forEach((v) => urlObj.searchParams.append(key, String(v)));
+        } else {
+          urlObj.searchParams.append(key, String(value));
+        }
+      });
+      urlWithParams = finalUrl.startsWith("http")
+        ? urlObj.href
+        : urlObj.pathname + urlObj.search;
+    }
+
+    const requestController = new AbortController();
+    activeControllers.add(requestController);
 
     let finalInit: RequestInitExt = {
       ...init,
       headers: mergeHeaders(localConfig.headers, init?.headers),
     };
 
-    // 1. Ejecutar Interceptor Pre-Request
     if (localConfig.onRequest) {
-      // Le pasamos el control a la config global para que modifique el init
-      finalInit = await localConfig.onRequest(finalUrl, finalInit);
+      finalInit = await localConfig.onRequest(urlWithParams, finalInit);
     }
 
     const {
@@ -185,148 +249,331 @@ export function createSafeFetch(defaultConfig: SafeFetchConfig = {}) {
       timeout,
       retries = 0,
       retryDelay = 1000,
+      params,
+      responseType,
+      signal: userSignal,
       ...props
     } = finalInit || {};
 
-    const contentTypeJson: ContentType = "application/json";
     let newBody = body;
+    const finalHeaders = headers || ({} as HeadersType);
+    const contentTypeJson: ContentType = "application/json";
 
-    // 2. Auto-Stringify JSON Body
-    if (
-      body &&
-      typeof body === "object" &&
-      headers?.["Content-Type"] === contentTypeJson
-    ) {
-      newBody = JSON.stringify(body);
+    const isFormData =
+      typeof FormData !== "undefined" && body instanceof FormData;
+    const isBlob = typeof Blob !== "undefined" && body instanceof Blob;
+    const isBuffer =
+      typeof ArrayBuffer !== "undefined" && body instanceof ArrayBuffer;
+    const isSearchParams =
+      typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams;
+    const isReadableStream =
+      typeof ReadableStream !== "undefined" && body instanceof ReadableStream;
+
+    if (isFormData) {
+      if (finalHeaders["Content-Type"]) {
+        delete finalHeaders["Content-Type"];
+      }
+    } else if (isBlob || isBuffer || isSearchParams || isReadableStream) {
+      // native handling
+    } else {
+      if (
+        body &&
+        typeof body === "object" &&
+        // Si no se especificó content-type, o si es explicitamente json
+        (!finalHeaders["Content-Type"] ||
+          finalHeaders["Content-Type"] === contentTypeJson)
+      ) {
+        newBody = JSON.stringify(body);
+
+        // Aseguramos el header si no estaba
+        if (!finalHeaders["Content-Type"]) {
+          finalHeaders["Content-Type"] = contentTypeJson;
+        }
+      }
     }
 
-    // Variable para guardar el último error o respuesta fallida
     let lastError: any;
     let response: Response | undefined;
 
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      let controller: AbortController | undefined;
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      try {
-        if (timeout) {
-          controller = new AbortController();
-          props.signal = controller.signal;
-          timeoutId = setTimeout(() => controller?.abort(), timeout);
-        }
+    try {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        let timeoutController: AbortController | undefined;
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const signalsToMerge: (AbortSignal | undefined | null)[] = [
+            userSignal, // 1. Usuario
+            requestController.signal, // 2. Cancelación Masiva (abortAll)
+          ];
 
-        const response = await fetch(finalUrl, {
-          method,
-          headers: toHeaders(headers || ({} as HeadersType)),
-          body: newBody as BodyInit,
-          ...props,
-        });
+          if (timeout) {
+            timeoutController = new AbortController();
+            timeoutId = setTimeout(() => timeoutController?.abort(), timeout);
+            signalsToMerge.push(timeoutController.signal);
+          }
 
-        // Limpiar timeout si hubo éxito de red
-        if (timeoutId) clearTimeout(timeoutId);
+          const effectiveSignal = mergeSignals(...signalsToMerge);
 
-        // 3. Lógica de "Debería reintentar?" para Status Codes
-        // Si es 5xx (Error de servidor), lo consideramos fallo temporal.
-        // Si es < 500 (ej: 200, 404), es una respuesta válida, rompemos el bucle.
-        if (response.status < 500) {
-          break;
-        } else {
-          // Es un error 500. Si nos quedan intentos, lanzamos error para ir al catch
-          // y provocar el reintento. Si es el último, no lanzamos y dejamos pasar la response.
+          if (localConfig.debug && attempt === 0) {
+            console.log(`🚀 [SafeFetch] ${method} ${urlWithParams}`);
+          }
+
+          response = await fetch(urlWithParams, {
+            method,
+            headers: toHeaders(headers || ({} as HeadersType)),
+            body: newBody as BodyInit,
+            signal: effectiveSignal,
+            ...props,
+          });
+
+          if (timeoutId) clearTimeout(timeoutId);
+
+          if (response.status < 500) {
+            if (!response.ok && localConfig.onResponseError) {
+              const recoveredResponse = await localConfig.onResponseError(
+                response,
+                attempt,
+              );
+              if (recoveredResponse instanceof Response) {
+                response = recoveredResponse;
+              }
+            }
+            break;
+          } else {
+            if (attempt < retries) {
+              throw new Error(`Server Error ${response.status}`);
+            }
+          }
+        } catch (error: any) {
+          lastError = error;
+          if (timeoutId) clearTimeout(timeoutId);
+
+          if (error.name === "AbortError") {
+            // Lógica de diagnóstico de error
+            if (timeout && timeoutController?.signal.aborted) {
+              lastError = new Error(`Request timeout after ${timeout}ms`);
+            } else if (userSignal?.aborted) {
+              lastError = new Error("Request aborted by user");
+            } else if (requestController.signal.aborted) {
+              lastError = new Error("Request aborted by safeFetch.abortAll()");
+            } else {
+              lastError = error;
+            }
+          }
+
+          if (localConfig.debug) {
+            console.warn(
+              `⚠️ [Attempt ${attempt + 1}/${retries + 1}] Failed: ${lastError.message}`,
+            );
+          }
+
           if (attempt < retries) {
-            throw new Error(`Server Error ${response.status}`);
+            await new Promise((resolve) => setTimeout(resolve, retryDelay));
+            continue;
           }
         }
-      } catch (error: any) {
-        // Capturamos Errores de Red, Timeout o nuestro Error 500 forzado arriba
-        lastError = error;
-
-        // Limpieza de seguridad
-        if (timeoutId) clearTimeout(timeoutId);
-
-        // Si es Timeout, mejoramos el mensaje
-        if (error.name === "AbortError" && timeout) {
-          lastError = new Error(`Request timeout after ${timeout}ms`);
-        }
-
-        // 4. Decisión: ¿Reintentamos o nos rendimos?
-        if (attempt < retries) {
-          // Esperamos antes del siguiente intento (Backoff simple)
-          await new Promise((resolve) => setTimeout(resolve, retryDelay));
-          continue; // 🔄 Vuelve al inicio del for
-        }
+        break;
       }
-      // Si llegamos aquí sin 'continue', es porque el fetch tuvo éxito (status < 500)
-      // o porque se acabaron los intentos. Rompemos el bucle.
-      break;
+
+      if (!response) {
+        if (localConfig.debug) {
+          console.error("❌ [SafeFetch] Request Failed Definitively.");
+          console.error("📋 Copy this cURL to debug:");
+          console.log(
+            generateCurl({
+              url: urlWithParams,
+              method,
+              headers: finalHeaders,
+              body: newBody,
+            }),
+          );
+        }
+
+        if (localConfig.onError) localConfig.onError(lastError);
+        throw lastError; // Lanzamos el último error capturado
+      }
+
+      // Handlers execution...
+      const statusHandlerName = `on${response.status}` as keyof SafeFetchConfig;
+      const specificHandler = localConfig[statusHandlerName];
+
+      if (typeof specificHandler === "function") {
+        await (specificHandler as Function)(response);
+      }
+
+      if (
+        response.status >= 500 &&
+        localConfig.on500 &&
+        response.status !== 500
+      ) {
+        await localConfig.on500(response);
+      }
+
+      if (localConfig.onResponse) {
+        await localConfig.onResponse(response);
+      }
+
+      return response;
+    } finally {
+      activeControllers.delete(requestController);
     }
+  };
 
-    // Si no hay response (porque fallaron todos los intentos de red/timeout)
-    if (!response) {
-      if (localConfig.onError) localConfig.onError(lastError);
-      throw lastError; // Lanzamos el último error capturado
+  /**
+   * Helper genérico para realizar peticiones y parsear la respuesta automáticamente.
+   * @template T Tipo de dato esperado en la respuesta.
+   */
+  const request = async <T>(url: string, init: RequestInitExt): Promise<T> => {
+    const response = await core(url, init);
+    const type = init?.responseType || "json";
+
+    if (type === "response") return response as unknown as T;
+    if (type === "blob") return (await response.blob()) as unknown as T;
+    if (type === "arrayBuffer")
+      return (await response.arrayBuffer()) as unknown as T;
+    if (type === "text") return (await response.text()) as unknown as T;
+
+    // 204 No Content -> Retornamos objeto vacío o null
+    if (response.status === 204) return {} as T;
+
+    const text = await response.text();
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return text as unknown as T;
     }
+  };
 
-    // Ejecutar Handlers Específicos de Status (on200, on404, etc)
-    const statusHandlerName = `on${response.status}` as keyof SafeFetchConfig;
-    const specificHandler = localConfig[statusHandlerName];
+  const httpMethods = {
+    /** Realiza una petición GET */
+    get: <T>(url: string, init?: RequestInitExt) =>
+      request<T>(url, { ...init, method: "GET" }),
+    /** Realiza una petición POST enviando datos JSON */
+    post: <T>(url: string, body?: any, init?: RequestInitExt) =>
+      request<T>(url, {
+        ...init,
+        method: "POST",
+        body,
+        headers: { "Content-Type": "application/json", ...init?.headers },
+      }),
+    /** Realiza una petición PUT */
+    put: <T>(url: string, body?: any, init?: RequestInitExt) =>
+      request<T>(url, {
+        ...init,
+        method: "PUT",
+        body,
+        headers: { "Content-Type": "application/json", ...init?.headers },
+      }),
+    /** Realiza una petición PATCH */
+    patch: <T>(url: string, body?: any, init?: RequestInitExt) =>
+      request<T>(url, {
+        ...init,
+        method: "PATCH",
+        body,
+        headers: { "Content-Type": "application/json", ...init?.headers },
+      }),
+    /** Realiza una petición DELETE */
+    delete: <T>(url: string, init?: RequestInitExt) =>
+      request<T>(url, { ...init, method: "DELETE" }),
+  };
 
-    if (typeof specificHandler === "function") {
-      // TypeScript no sabe si recibe args o no, pero en JS pasar args extra no rompe nada.
-      // Casteamos a Function para evitar errores de tipado estricto aquí.
-      await (specificHandler as Function)(response);
-    }
-
-    if (
-      response.status >= 500 &&
-      localConfig.on500 &&
-      response.status !== 500
-    ) {
-      // Evitamos ejecutarlo doble si el status es exactamente 500
-      await localConfig.on500(response);
-    }
-
-    if (localConfig.onResponse) {
-      await localConfig.onResponse(response);
-    }
-
-    return response;
+  /**
+   * 🛑 **Abort All**
+   * Cancela TODAS las peticiones activas iniciadas por esta instancia.
+   * Útil para limpieza en `useEffect` o al cambiar de página.
+   */
+  const abortAll = () => {
+    activeControllers.forEach((c) => c.abort());
+    activeControllers.clear();
   };
 
   return Object.assign(core, {
     configure,
     create: configure, // Alias por si prefieres 'create' para configurar
+    abortAll,
+    ...httpMethods,
   });
 }
 
 /**
- * 🛠️ **Configuración**
- * Permite establecer la configuración global de `safeFetch`.
- * Las configuraciones se fusionan, no se sobrescriben destructivamente.
- *
- * @param config Objeto parcial de configuración.
- * @example
- * safeFetch.configure({
- * baseUrl: "https://api.xyz.com",
- * on401: () => logout(),
- * });
- */
-// const configure = (config: SafeFetchConfig) => {
-//   // Fusionamos la config nueva con la existente
-//   globalConfig = {
-//     ...globalConfig,
-//     ...config,
-//     // Nota: los headers se fusionan, no se reemplazan totalmente
-//     headers: { ...globalConfig.headers, ...config.headers },
-//   };
-// };
-
-/**
- * La instancia principal de SafeFetch.
- * Se puede usar como función directa `safeFetch(url)` o configurar vía `safeFetch.configure()`.
+ * Instancia por defecto de SafeFetch lista para usar.
  */
 export const safeFetch = createSafeFetch();
-
 export default safeFetch;
+
+/**
+ * Fusiona dos AbortSignals. Si cualquiera de los dos aborta, el resultado aborta.
+ */
+function mergeSignals(
+  ...signals: (AbortSignal | undefined | null)[]
+): AbortSignal | undefined {
+  // Filtramos los nulos/undefined
+  const activeSignals = signals.filter((s) => s) as AbortSignal[];
+
+  if (activeSignals.length === 0) return undefined;
+  if (activeSignals.length === 1) return activeSignals[0];
+
+  // 1. Soporte Nativo (Node 20+, Chrome 116+, Bun)
+  if ("any" in AbortSignal && typeof AbortSignal.any === "function") {
+    // @ts-ignore
+    return AbortSignal.any(activeSignals);
+  }
+  const cleanup = () => {
+    for (const sig of activeSignals) {
+      sig.removeEventListener("abort", onAbort);
+    }
+  };
+
+  // 2. Polyfill Robusto
+  const controller = new AbortController();
+
+  // Si alguno ya está abortado, abortamos inmediatamente
+  for (const sig of activeSignals) {
+    if (sig.aborted) {
+      controller.abort(sig.reason);
+      return controller.signal;
+    }
+  }
+
+  const onAbort = (evt: Event) => {
+    controller.abort((evt.target as AbortSignal).reason);
+    cleanup();
+  };
+
+  // Suscribirse
+  for (const sig of activeSignals) {
+    sig.addEventListener("abort", onAbort, { once: true });
+  }
+
+  return controller.signal;
+}
+
+/**
+ * Genera un comando cURL para debugging fácil.
+ */
+function generateCurl(req: {
+  url: string;
+  method: string;
+  headers: HeadersType;
+  body: any;
+}) {
+  let curl = `curl -X ${req.method} '${req.url}'`;
+
+  Object.entries(req.headers || {}).forEach(([key, value]) => {
+    if (value) curl += ` \\\n  -H '${key}: ${value}'`;
+  });
+
+  if (req.body) {
+    // Solo agregamos body si es string (JSON)
+    // FormData es muy complejo de representar en curl simple
+    if (typeof req.body === "string") {
+      curl += ` \\\n  -d '${req.body.replace(/'/g, "'\\''")}'`;
+    } else {
+      curl += ` \\\n  --data '[Complex Body]'`;
+    }
+  }
+  return curl;
+}
 
 /**
  * Utilidad para unir cadenas o arrays (útil para clases CSS o Paths).
