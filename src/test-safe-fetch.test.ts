@@ -1,4 +1,4 @@
-import { createSafeFetch } from "./safe-fetch";
+import { createSafeFetch } from ".";
 
 const globalScope = typeof globalThis !== "undefined" ? globalThis : global;
 const originalFetch = globalScope.fetch;

@@ -255,7 +255,10 @@ export function createSafeFetch(defaultConfig: SafeFetchConfig = {}) {
       ...props
     } = finalInit || {};
 
-    let newBody = body;
+    const methodUpper = method.toUpperCase();
+    const hasBody = methodUpper !== "GET" && methodUpper !== "HEAD";
+
+    let newBody = hasBody ? body : undefined;
     const finalHeaders = headers || ({} as HeadersType);
     const contentTypeJson: ContentType = "application/json";
 
@@ -277,6 +280,7 @@ export function createSafeFetch(defaultConfig: SafeFetchConfig = {}) {
       // native handling
     } else {
       if (
+        hasBody &&
         body &&
         typeof body === "object" &&
         // Si no se especificó content-type, o si es explicitamente json
@@ -290,6 +294,10 @@ export function createSafeFetch(defaultConfig: SafeFetchConfig = {}) {
           finalHeaders["Content-Type"] = contentTypeJson;
         }
       }
+    }
+
+    if (!hasBody && finalHeaders["Content-Type"]) {
+      delete finalHeaders["Content-Type"];
     }
 
     let lastError: any;

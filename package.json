@@ -1,14 +1,16 @@
 {
   "name": "@alexfalconflores/safe-fetch",
-  "version": "1.0.4",
-  "description": "A safe and customizable fetch wrapper for secure HTTP requests.",
+  "version": "1.0.5",
+  "description": "The production-ready, typed HTTP client with built-in retries, timeouts, interceptors, and cancellation.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
-    "types": "./dist/index.d.ts",
-    "import": "./dist/index.mjs",
-    "require": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
   },
   "files": [
     "dist"
@@ -24,9 +26,14 @@
   "keywords": [
     "fetch",
     "http",
-    "secure",
+    "typescript",
     "api",
     "http-client",
+    "retries",
+    "timeout",
+    "interceptors",
+    "abort-controller",
+    "cancellation",
     "request-wrapper"
   ],
   "author": "Alex Stefano Falcon Flores",
@@ -35,12 +42,18 @@
     "build": "tsup",
     "dev": "tsup src/index.ts --watch --dts",
     "clean": "rm -rf dist",
-    "release": "npm publish --access public"
+    "test": "bun test",
+    "push": "bun run build && yalc add",
+    "prepublishOnly": "bun run clean && bun run build",
+    "release": "bun publish --access public"
   },
   "devDependencies": {
     "tsup": "8.4.0",
     "typescript": "5.8.3",
-    "@types/bun": "1.3.9",
+    "@types/bun": "latest",
     "@types/node": "25.2.3"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
   }
 }
