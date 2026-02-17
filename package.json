@@ -1,6 +1,6 @@
 {
   "name": "@alexfalconflores/safe-fetch",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "The production-ready, typed HTTP client with built-in retries, timeouts, interceptors, and cancellation.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
