@@ -5,8 +5,8 @@
 </h1>
 
 <p align="center">
-  <strong>HTTP client tipado, listo para producción, para apps modernas en TypeScript.</strong><br />
-  Un wrapper ligero y sin dependencias alrededor de <code>fetch</code> con reintentos, timeouts, interceptores, abortAll y tipado fuerte.
+<strong>Typed, production‑ready HTTP client for modern TypeScript apps.</strong><br />
+A lightweight, zero‑dependency wrapper around <code>fetch</code> with retries, timeouts, interceptors, abortAll and strong typing.
 </p>
 
 <p align="center">
@@ -23,44 +23,44 @@
 
 ---
 
-## 🚀 ¿Por qué safeFetch?
+## 🚀 Why safeFetch?
 
-El `fetch` nativo es genial, pero en apps reales siempre terminamos escribiendo lo mismo:
+Native ‎`fetch` is great, but in real apps we always end up writing the same things:
 
-- Manejo de errores repetitivo.
-- Transformar respuestas a JSON.
-- Añadir headers comunes.
-- Manejar **timeouts**, **reintentos**, **abortController**, etc.
+- Repetitive error handling.
+- Converting responses to JSON.
+- Adding common headers.
+- Dealing with timeouts, retries, AbortController, etc.
 
-**safeFetch** resuelve todo esto sin la pesadez de Axios.
+safeFetch solves all of this without the heaviness of Axios.
 
-- ✨ Tipado fuerte con genéricos `<T>` en las respuestas.
-- 🔄 Reintentos automáticos en errores de red o respuestas 5xx.
-- ⏱️ Timeouts configurables por request.
-- 🛑 `abortAll()` para cancelar todas las peticiones de una instancia.
-- 🪝 Interceptores (`onRequest`, `onResponse`, `onResponseError`).
-- 🧠 Handlers de status HTTP (on200, on401, on500, etc).
-- 🔍 Modo debug con comandos **cURL** listos para copiar/pegar.
-- 🍬 Azúcar sintáctica: `.get()`, `.post()`, `.put()`, `.delete()`, `.patch()`.
-- 📦 Tipos para headers comunes (`Content-Type`, `Authorization`, `Accept`, etc).
+- ✨ Strong typing with ‎`<T>` generics on responses.
+- 🔄 Automatic retries on network errors or 5xx responses.
+- ⏱️ Per‑request configurable timeouts.
+- 🛑 ‎`abortAll()` to cancel all pending requests for an instance.
+- 🪝 Interceptors (‎`onRequest`, ‎`onResponse`, ‎`onResponseError`).
+- 🧠 HTTP status handlers (on200, on401, on500, etc).
+- 🔍 Debug mode with ready‑to‑paste cURL commands.
+- 🍬 Sugar syntax: ‎`.get()`, ‎`.post()`, ‎`.put()`, ‎`.delete()`, ‎`.patch()`.
+- 📦 Typed headers for common cases (‎`Content-Type`, ‎`Authorization`, ‎`Accept`, etc).
 
 ---
 
-## 📦 Instalación
+## 📦 Installation
 
 ```bash
 npm install @alexfalconflores/safe-fetch
-# o
+# or
 bun add @alexfalconflores/safe-fetch
 ```
 
 ---
 
-## 💻 Uso básico
+## 💻 Basic usage
 
-### 1. Singleton por defecto
+### 1. Default singleton
 
-Para casos simples, usa la instancia por defecto `safeFetch`:
+For simple cases, use the default ‎`safeFetch` instance:
 
 ```ts
 import safeFetch from "@alexfalconflores/safe-fetch";
@@ -104,16 +104,16 @@ await safeFetch("/api/users", {
 });
 ```
 
-Internamente:
+Under the hood:
 
-- Si el método no es `GET`/`HEAD` y el body es un objeto, se serializa como JSON.
-- Si no defines `Content-Type`, se usa `"application/json"` por defecto.
+- If the method is not ‎`GET`/‎`HEAD` and the body is an object, it will be serialized as JSON.
+- If you don’t define ‎`Content-Type`, ‎`"application/json"` is used by default.
 
 ---
 
-## 🏭 Patrón recomendado: `createSafeFetch`
+## 🏭 Recommended pattern: ‎`createSafeFetch
 
-Lo ideal es crear **instancias aisladas por API** (Backend, terceros, etc).
+The ideal setup is to create **isolated instances per API** (backend, third‑party services, etc).
 
 ```ts
 import { createSafeFetch } from "@alexfalconflores/safe-fetch";
@@ -157,14 +157,15 @@ const data = await api.get<DashboardResponse>("/dashboard");
 console.log(data.stats.users);
 ```
 
-### Actualizar configuración en caliente
+### Update configuration on the fly
 
-Puedes actualizar ‎`baseUrl`, `headers` y `handlers` sin crear una nueva instancia.
-Un patrón muy común (especialmente en frameworks como Next.js) es configurar ‎`safeFetch` una sola vez y luego simplemente importarlo donde lo necesites.
+You can update ‎`baseUrl`, ‎`headers` and ‎`handlers` without creating a new instance.
+
+A common pattern (especially in frameworks like Next.js) is to configure ‎`safeFetch` once and then simply import it wherever you need it.
 
 ```ts
 // config.ts
-// Configuración global para la instancia por defecto de safeFetch
+// Global configuration for the default safeFetch instance
 
 import safeFetch from "@alexfalconflores/safe-fetch";
 import { getSession } from "./auth";
@@ -188,20 +189,20 @@ safeFetch.configure({
   },
   on401: async () => {
     console.error("Unauthorized: Redirecting to login page.");
-    // redirectToLogin(); // tu lógica aquí
+    // redirectToLogin(); // your logic here
   },
 });
 ```
 
-Luego importas esta configuración una sola vez en el nivel más alto de tu app (para que se ejecute antes de cualquier request):
+Then import this configuration once at the top level of your app (so it runs before any requests):
 
-> `app/layout.tsx` (o tu archivo de entrada principal)
+> `app/layout.tsx` (or your main entry file)
 
 ```ts
 import "./config.ts";
 ```
 
-A partir de ahí, en cualquier parte de tu código puedes usar ‎`safeFetch` ya configurado
+From that point on, you can use the already configured ‎`safeFetch` anywhere in your code:
 
 ```ts
 import safeFetch from "@alexfalconflores/safe-fetch";
@@ -215,7 +216,7 @@ const usersCore = await safeFetch("/api/users", {
 
 ---
 
-Si creas una instancia personalizada con ‎`createSafeFetch`, también puedes re‑configurarla.
+If you create a custom instance with ‎`createSafeFetch`, you can also re‑configure it:
 
 ```ts
 import { createSafeFetch } from "@alexfalconflores/safe-fetch";
@@ -231,13 +232,13 @@ api.configure({
 });
 ```
 
-> La configuración nueva se fusiona con la anterior (los headers se mezclan, no se reemplazan completamente).
+> New configuration is merged with the existing one (headers are merged, not fully replaced).
 
 ---
 
 ## 🪝 Interceptores y manejo global
 
-### `onRequest`: inyectar token, modificar URL, etc.
+### `onRequest`: inject token, tweak URL, etc.
 
 ```ts
 const api = createSafeFetch({
@@ -255,7 +256,7 @@ const api = createSafeFetch({
 });
 ```
 
-### `onResponse`: logging global
+### `onResponse`: global logging
 
 ```ts
 const api = createSafeFetch({
@@ -266,19 +267,19 @@ const api = createSafeFetch({
 });
 ```
 
-### `onResponseError`: refrescar token / reintento transparente
+### `onResponseError`: refresh token / transparent retry
 
 ```ts
 const api = createSafeFetch({
   baseUrl: "https://api.myapp.com",
   async onResponseError(response, attempt) {
-    // Primer 401 ➜ intenta refrescar token y reintentar
+    // First 401 ➜ try to refresh token and retry
     if (response.status === 401 && attempt === 0) {
       await refreshToken(); // Tu lógica
-      // Reintenta la misma URL con la nueva configuración
+      // Retry the same URL with the new configuration
       return api.request(response.url, {
         method: response.request?.method ?? "GET",
-        // Puedes pasar aquí init original si lo guardas tú mismo
+        // You can pass the original init here if you store it yourself
         responseType: "response",
       });
     }
@@ -286,32 +287,32 @@ const api = createSafeFetch({
 });
 ```
 
-> Nota: en tu app real, conviene guardar el `init` original para reusarlo al reintentar.
+> Note: in a real app, it’s usually better to store the original ‎`init` so you can reuse it when retrying.
 
 ---
 
-## 🧠 Handlers por status HTTP
+## 🧠 HTTP status handlers
 
-safeFetch te permite asociar callbacks a códigos HTTP específicos.
+safeFetch lets you attach callbacks to specific HTTP status codes.
 
-En lugar de hacer ‎`console.log`, lo normal es delegar en servicios compartidos (auth, notificaciones, métricas, etc.).
+Instead of doing ‎`console.log`, it’s more realistic to delegate to shared services (auth, notifications, monitoring, etc.).
 
-Ejemplo: centralizar sesión expirada, notificaciones y reporting
+Example: centralize expired session handling, notifications and reporting.
 
-Supongamos que tienes tres utilidades simples:
+Assume you have three simple utilities:
 
 ```ts
 // auth.ts
 export function forceLogout() {
-  // Limpia tokens, estado global, etc.
+  // Clear tokens, global state, etc.
   localStorage.removeItem("token");
-  // Podrías usar tu router aquí
+  // You can use your router here
   window.location.href = "/login";
 }
 
 // notifications.ts
 export function notifyError(message: string) {
-  // Aquí podrías integrar Sonner, Toastify, Radix, lo que uses en tu app
+  // Here you could integrate Sonner, Toastify, Radix, etc.
   // Por ejemplo:
   // toast.error(message);
   console.error("[UI ERROR]", message);
@@ -319,7 +320,7 @@ export function notifyError(message: string) {
 
 // monitoring.ts
 export function reportError(error: unknown) {
-  // En un proyecto real: enviar a Sentry, Datadog, LogRocket, etc.
+  // In a real project: send to Sentry, Datadog, LogRocket, etc.
   console.error("[REPORT ERROR]", error);
 }
 ```
@@ -336,7 +337,7 @@ const api = createSafeFetch({
   baseUrl: "https://api.myapp.com",
   // 4xx: errores de cliente
   async on400(response) {
-    // Ejemplo: extraer errores de validación y mostrarlos en la UI
+    // Example: extract validation errors and show them in the UI
     try {
       const data = await response.json();
       const message =
@@ -347,19 +348,19 @@ const api = createSafeFetch({
     }
   },
   async on401() {
-    // Sesión expirada ➜ forzar logout y redirigir a login
+    // Session expired ➜ force logout and redirect to login
     notifyError("Tu sesión ha expirado. Ingresa nuevamente.");
     forceLogout();
   },
   on403() {
-    // Sin permisos ➜ mostrar mensaje genérico
+    // No permissions ➜ show generic message
     notifyError("No tienes permisos para realizar esta acción (403).");
   },
   on404() {
-    // Recurso no encontrado ➜ podrías actualizar un store de routing
+    // Resource not found ➜ you may update a routing store, etc.
     notifyError("Recurso no encontrado (404).");
   },
-  // 5xx: errores de servidor
+  // 5xx: server errors
   async on500(response) {
     notifyError("Estamos teniendo problemas en el servidor. Inténtalo más tarde.");
     reportError({
@@ -367,7 +368,7 @@ const api = createSafeFetch({
       url: response.url,
     });
   },
-  // Error de red (sin respuesta HTTP)
+  // Network error (no HTTP response)
   onError(error) {
     notifyError("Parece que no tienes conexión a Internet.");
     reportError(error);
@@ -375,27 +376,27 @@ const api = createSafeFetch({
 });
 ```
 
-En tu código de negocio solo usas ‎`api` normalmente:
+In your business code you just use ‎`api` normally:
 ```ts
-// Ejemplo en un servicio de dominio / React hook
+// Example in a domain service / React hook
 export async function fetchCurrentUser() {
   const user = await api.get<User>("/me");
   return user;
 }
 ```
->💡 Así mantienes la lógica de red en un solo lugar (safeFetch + handlers)
-> y tu UI solo se conecta a utilidades como ‎`notifyError`, ‎`forceLogout`, etc.
+>💡 This keeps all network logic in one place (safeFetch + handlers)
+and your UI only talks to utilities like ‎`notifyError`, ‎`forceLogout`, etc.
 
-Además de los handlers específicos (`on200`, `on404`, `on503`, etc.), también tienes:
+Besides specific handlers (‎`on200`, ‎`on404`, ‎`on503`, etc.), you also have:
 
-- `onError(error)`: cuando falla la red (sin Internet, DNS, CORS, timeout, abort).
-- `onResponse(response)`: se ejecuta siempre que haya respuesta (2xx, 3xx, 4xx, 5xx).
+- ‎`onError(error)`: when the network fails (no Internet, DNS, CORS, timeout, abort).
+- ‎`onResponse(response)`: runs whenever there is a response (2xx, 3xx, 4xx, 5xx).
 
 ---
 
-## ⏱️ Timeouts y reintentos
+## ⏱️ Timeouts and retries
 
-### Timeout por petición
+### Per‑request timeout
 
 ```ts
 const user = await api.get<User>("/users/1", {
@@ -403,34 +404,34 @@ const user = await api.get<User>("/users/1", {
 });
 ```
 
-Si se supera el tiempo:
+If the timeout is exceeded:
 
-- Se aborta la request.
-- Se lanza un error con el mensaje `Request timeout after 5000ms`.
+- The request is aborted.
+- An error is thrown with the message ‎`Request timeout after 5000ms`.
 
-### Reintentos en errores de red / 5xx
+### Retries on network / 5xx errors
 
 ```ts
 const data = await api.get("/flaky-endpoint", {
-  retries: 3, // 3 reintentos
-  retryDelay: 1000, // 1s entre reintento y reintento
-  timeout: 4000, // Máximo 4s por intento
+  retries: 3, // 3 retries
+  retryDelay: 1000, // 1s between retries
+  timeout: 4000, // Max 4s per attempt
 });
 ```
 
-El flujo es:
+Execution flow:
 
-1. Intento 1 → falla (red o 5xx) → espera 1s.
-2. Intento 2 → falla → espera 1s.
-3. Intento 3 → falla → lanza el último error capturado.
+1. Attempt 1 → fails (network or 5xx) → wait 1s.
+2. Attempt 2 → fails → wait 1s.
+3. Attempt 3 → fails → throw the last captured error.
 
 ---
 
-## 🛑 Cancelar todas las requests (`abortAll`)
+## 🛑 Cancel all requests (`abortAll`)
 
-Cada instancia de `safeFetch` mantiene su propio conjunto de `AbortController`.
+Each ‎`safeFetch` instance keeps its own set of ‎`AbortController`s.
 
-Esto es perfecto para React, al desmontar componentes:
+This is perfect for React when unmounting components:
 
 ```ts
 import { useEffect, useState } from "react";
@@ -453,7 +454,7 @@ function HeavyComponent() {
       });
 
     return () => {
-      api.abortAll(); // Cancela TODO lo que siga pendiente
+      api.abortAll(); // Cancels ALL pending requests for this instance
     };
   }, []);
 
@@ -463,9 +464,9 @@ function HeavyComponent() {
 
 ---
 
-## 🔍 Query params fáciles
+## 🔍 Easy query params
 
-Olvídate de construir `URLSearchParams` a mano:
+Forget about building ‎`URLSearchParams` manually:
 
 ```ts
 // Genera: GET /search?q=books&page=2&tags=a&tags=b
@@ -478,17 +479,18 @@ await api.get("/search", {
 });
 ```
 
-- `undefined` y `null` se ignoran.
-- Los arrays se convierten en múltiples query params.
+- ‎`undefined` and ‎`null` are ignored.
+- Arrays become multiple query params.
 
 ---
 
-## 📥 Tipos de respuesta (`responseType`)
+## 📥 Response types (‎`responseType`)
 
-Por defecto, intenta parsear JSON (`responseType: "json"`). Si el backend no devuelve JSON válido, retorna el `text` crudo.:
+By default, safeFetch tries to parse the response as JSON (‎`responseType: "json"`).
+If the backend does not return valid JSON, it falls back to returning the raw ‎`text`.
 
 ```ts
-// Texto plano (HTML, CSV, etc.)
+// Plain text (HTML, CSV, etc.)
 const html = await api.get<string>("/page", {
   responseType: "text",
 });
@@ -498,12 +500,12 @@ const file = await api.get<Blob>("/report.pdf", {
   responseType: "blob",
 });
 
-// ArrayBuffer (binarios para procesar a bajo nivel)
+// ArrayBuffer (binary data for low‑level processing)
 const buffer = await api.get<ArrayBuffer>("/binary", {
   responseType: "arrayBuffer",
 });
 
-// Response nativo sin procesar (tú te encargas del manejo)
+// Raw native Response (you handle parsing yourself)
 const response = await api.get<Response>("/raw", {
   responseType: "response",
 });
@@ -511,9 +513,9 @@ const response = await api.get<Response>("/raw", {
 
 ---
 
-## 🧱 Headers tipados (quality-of-life)
+## 🧱 Typed headers (quality‑of‑life)
 
-`HeadersType` te da **autocompletado y seguridad de tipos** para la mayoría de headers HTTP comunes:
+‎`HeadersType` gives you autocomplete and type safety for most common HTTP headers:
 
 ```ts
 import {
@@ -538,13 +540,13 @@ const api = createSafeFetch({
 });
 ```
 
-También puedes usar valores personalizados si lo necesitas.
+You still keep full flexibility for custom headers, while getting strong typing and autocomplete for the standard ones.
 
 ---
 
-## 🛠 Utilidades: `Join`
+## 🛠 Utility: `Join`
 
-Pequeño helper para unir strings o arrays:
+Small helper to join strings or arrays:
 
 ```ts
 import { Join } from "@alexfalconflores/safe-fetch";
@@ -555,31 +557,35 @@ const classes = Join(" ", "btn", ["btn-primary", "btn-lg"]); // "btn btn-primary
 
 ---
 
-## 🧩 Compatibilidad
+## 🧩 Compatibility
 
-Funciona en todos los runtimes modernos:
+Works in all modern runtimes:
 
-- ✅ Navegador (Chrome, Firefox, Safari, Edge)
-- ✅ Node.js (v18+ o con polyfill de `fetch`)
+- ✅ Browser (Chrome, Firefox, Safari, Edge)
+- ✅ Node.js (v18+ or with a ‎`fetch` polyfill)
 - ✅ Bun
 - ✅ Deno
 
 ---
 
-## 👤 Autor
+## 👤 Author
 
 Alex Stefano Falcon Flores
 
 - 🐙 GitHub: [alexfalconflores](https://github.com/alexfalconflores)
 - 💼 LinkedIn: [alexfalconflores](https://www.linkedin.com/in/alexfalconflores/)
+- 🌐 Website: [alexfalconflores](https://www.alexfalconflores.com/)
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia MIT. Revisa el archivo [LICENSE](./LICENSE) para más detalles.
+This project is licensed under the MIT license. See the LICENSE ↗ file for more details.
 
 <p align="center">
-⭐ <strong>¿Te sirve?</strong> Dale una estrella en GitHub.<br />
-Construido con ❤️ en Perú 🇵🇪
+
+⭐ <strong>Find it useful?</strong> Give it a star on GitHub.<br />
+
+Built with ❤️ in Peru 🇵🇪
+
 </p>
