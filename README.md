@@ -583,9 +583,6 @@ Alex Stefano Falcon Flores
 This project is licensed under the MIT license. See the LICENSE ↗ file for more details.
 
 <p align="center">
-
 ⭐ <strong>Find it useful?</strong> Give it a star on GitHub.<br />
-
 Built with ❤️ in Peru 🇵🇪
-
 </p>
